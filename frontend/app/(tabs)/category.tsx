@@ -429,10 +429,11 @@ export default function Category() {
     }, []),
   );
 
+  // --- Real-time Sync (Polling every 120s as backup) ---
   useEffect(() => {
     const interval = setInterval(() => {
       fetchTables();
-    }, 30000); 
+    }, 120000); 
     return () => clearInterval(interval);
   }, []); 
 
