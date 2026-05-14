@@ -103,33 +103,30 @@ const TableItemComponent = React.memo(
       state => state.tableMap[tableId]
     );
 
-    // 🟢 Prioritize Store Status over API Status for instant feedback
-    const status = (tableData && tableData.status !== 'EMPTY') 
-      ? (tableData.status === 'SENT' ? 1 : tableData.status === 'BILL_REQUESTED' ? 2 : tableData.status === 'HOLD' ? 3 : tableData.status === 'LOCKED' ? 5 : 1)
+    // 🚀 SYNC-FIRST: Prioritize real-time data from the global store
+    const status = tableData
+      ? (tableData.status === 'SENT' ? 1 : tableData.status === 'BILL_REQUESTED' ? 2 : tableData.status === 'HOLD' ? 3 : tableData.status === 'LOCKED' ? 5 : 0)
       : Number(item.Status);
+
+    const billAmount = tableData?.totalAmount !== undefined ? tableData.totalAmount : (Number(item.totalAmount) || 0);
+    const rawStartTime = tableData?.startTime || (item.StartTime ? (typeof item.StartTime === 'string' ? new Date(item.StartTime).getTime() : item.StartTime) : 0);
+    const isOvertime = status !== 0 && (tableData?.isHoldOvertime || Number(item.isOvertime) === 1 || Number(item.isHoldOvertime) === 1);
     
     let ui = getStatusUI(status);
 
-    // Dynamic Overtime: If occupied (Dining/Hold) and backend flagged as overtime, override UI
-    // Note: Status 2 (Checkout) is excluded here so that it keeps its high-priority Orange color.
-    if ((status === 1 || status === 3) && item.isOvertime) {
+    // Dynamic Overtime: If occupied (Dining/Hold) and flagged as overtime, override UI
+    if ((status === 1 || status === 3) && isOvertime) {
       ui = getStatusUI(4);
     }
 
-    // Use ONLY ui values derived from status
     const borderColor = status === 0 ? Theme.border : ui.color;
     const bgColor = status !== 0 ? ui.lightBg : Theme.bgCard;
     const textColor = status === 0 ? Theme.textPrimary : ui.color;
     const labelColor = Theme.textPrimary;
 
     let timeText = "";
-    let billAmount = tableData?.totalAmount || item.totalAmount || 0;
-
-    // Use ONLY valid (non-zero) startTime from any available source
-    const startTime = (tableData?.startTime && tableData.startTime !== 0) ? tableData.startTime : item.StartTime;
-    
-    if (startTime && status !== 0 && status !== 5) {
-      const time = new Date(startTime);
+    if (rawStartTime && status !== 0 && status !== 5) {
+      const time = new Date(rawStartTime);
       if (!isNaN(time.getTime())) {
         timeText = time.toLocaleTimeString([], {
           hour: "2-digit",

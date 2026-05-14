@@ -762,7 +762,7 @@ router.post("/cancel", async (req, res) => {
 
       await transaction.commit();
       
-      req.app.get("io")?.emit("table_status_updated", { tableId: cleanTid, status: 0, totalAmount: 0 });
+      await syncTableStatus(req, cleanTid);
       req.app.get("io")?.emit("order_closed", { tableId: cleanTid, orderId: orderId });
       
       res.json({ success: true });

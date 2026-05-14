@@ -171,6 +171,42 @@ async function initDB(pool) {
     await runQuery("Index - RestaurantOrderDetailCur OrderId", "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_RestaurantOrderDetailCur_OrderId') CREATE INDEX IX_RestaurantOrderDetailCur_OrderId ON [dbo].[RestaurantOrderDetailCur] (OrderId)");
     await runQuery("Index - TableMaster SortCode", "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_TableMaster_SortCode') CREATE INDEX IX_TableMaster_SortCode ON [dbo].[TableMaster] (SortCode)");
 
+    // 11. CompanySettings
+    await runQuery("Create CompanySettings", `
+      IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[CompanySettings]') AND type in (N'U'))
+      BEGIN
+          CREATE TABLE [dbo].[CompanySettings](
+              [Id] [nvarchar](50) NOT NULL PRIMARY KEY,
+              [CompanyName] [nvarchar](255) NULL,
+              [Address] [nvarchar](max) NULL,
+              [GSTNo] [nvarchar](50) NULL,
+              [GSTPercentage] [decimal](18, 2) NULL,
+              [Phone] [nvarchar](50) NULL,
+              [Email] [nvarchar](255) NULL,
+              [CashierName] [nvarchar](100) NULL,
+              [Currency] [nvarchar](50) NULL,
+              [CurrencySymbol] [nvarchar](10) NULL,
+              [CompanyLogoUrl] [nvarchar](max) NULL,
+              [HalalLogoUrl] [nvarchar](max) NULL,
+              [PrinterIP] [nvarchar](50) NULL,
+              [ShowCompanyLogo] [bit] DEFAULT 0,
+              [ShowHalalLogo] [bit] DEFAULT 0,
+              [TaxMode] [nvarchar](50) DEFAULT 'exclusive',
+              [WaiterRequired] [bit] DEFAULT 0,
+              [HoldOvertimeMinutes] [int] DEFAULT 30,
+              [UpdatedOn] [datetime] DEFAULT GETDATE()
+          )
+      END
+    `);
+    await runQuery("CompanySettings - HoldOvertimeMinutes", "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[CompanySettings]') AND name = 'HoldOvertimeMinutes') ALTER TABLE [dbo].[CompanySettings] ADD HoldOvertimeMinutes INT DEFAULT 30");
+
+    await runQuery("Insert Default CompanySettings", `
+      IF NOT EXISTS (SELECT TOP 1 1 FROM [dbo].[CompanySettings])
+      BEGIN
+          INSERT INTO [dbo].[CompanySettings] (Id, CompanyName, UpdatedOn) VALUES ('1', 'UCS POS', GETDATE())
+      END
+    `);
+
     console.log("✅ Database schema and performance indexes are up to date.");
   } catch (err) {
     console.error("❌ initDB CRITICAL ERROR:", err.message);

@@ -221,6 +221,8 @@ router.put("/status", async (req, res) => {
       OUTPUT 
         INSERTED.TotalAmount, 
         CONVERT(VARCHAR, INSERTED.StartTime, 126) AS StartTime,
+        INSERTED.TableNumber,
+        INSERTED.DiningSection,
         CASE 
           WHEN INSERTED.Status IN (1, 2, 3) AND INSERTED.StartTime IS NOT NULL AND INSERTED.StartTime > '2000-01-01' AND DATEDIFF(MINUTE, INSERTED.StartTime, GETDATE()) >= 60 THEN 1 
           ELSE 0 
@@ -247,11 +249,14 @@ router.put("/status", async (req, res) => {
     // 🔥 Emit socket event with TotalAmount, StartTime and isOvertime
     const io = req.app.get("io");
     if (io) {
+      const sectionMap = { "1": "SECTION_1", "2": "SECTION_2", "3": "SECTION_3", "4": "TAKEAWAY" };
       io.emit("table_status_updated", { 
         tableId: cleanTableId, 
         status: Number(status),
         totalAmount: currentTotal,
         startTime: currentStartTime,
+        tableNo: row?.TableNumber,
+        section: sectionMap[String(row?.DiningSection)] || row?.DiningSection,
         isOvertime: currentIsOvertime,
         isHoldOvertime: row?.isHoldOvertime || 0
       });
@@ -307,12 +312,13 @@ router.put("/:tableId/status", async (req, res) => {
     }
 
     // 🔥 Emit socket event for real-time sync across devices
+    const io = req.app.get("io");
     if (io) {
       // Get latest state for accurate broadcast
       const tableRes = await pool.request()
         .input("tableId", sql.VarChar(50), cleanTableId)
         .query(`
-          SELECT TotalAmount, CONVERT(VARCHAR, StartTime, 126) AS StartTime,
+          SELECT TableNumber, DiningSection, TotalAmount, CONVERT(VARCHAR, StartTime, 126) AS StartTime,
           CASE 
             WHEN Status IN (1, 2, 3) AND StartTime IS NOT NULL AND StartTime > '2000-01-01' AND DATEDIFF(MINUTE, StartTime, GETDATE()) >= 60 THEN 1 
             ELSE 0 
@@ -325,11 +331,14 @@ router.put("/:tableId/status", async (req, res) => {
         `);
       
       const row = tableRes.recordset[0];
+      const sectionMap = { "1": "SECTION_1", "2": "SECTION_2", "3": "SECTION_3", "4": "TAKEAWAY" };
       io.emit("table_status_updated", { 
         tableId: cleanTableId, 
         status: Number(status),
         totalAmount: row?.TotalAmount || 0,
         startTime: row?.StartTime || null,
+        tableNo: row?.TableNumber,
+        section: sectionMap[String(row?.DiningSection)] || row?.DiningSection,
         isOvertime: row?.isOvertime || 0,
         isHoldOvertime: row?.isHoldOvertime || 0
       });
