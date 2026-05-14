@@ -160,6 +160,7 @@ export default function SalesReport() {
     "CARD",
     "NETS",
     "PAYNOW",
+    "VOID",
   ]);
   const [activeOrderTypes, setActiveOrderTypes] = useState<string[]>([
     "DINE-IN",
@@ -526,6 +527,7 @@ export default function SalesReport() {
         cancelledAmount: summaryData.cancelledDetail?.amount || 0,
         
         paymentBreakdown,
+        cancelledOrders: summaryData.cancelledOrders || [],
         items: items.length > 0 ? items.map(i => ({
           name: i.name,
           qty: i.quantity,
@@ -779,7 +781,7 @@ export default function SalesReport() {
     }
 
     return dateScopedSales.filter((s) => {
-      const modeMatch = activePaymentModes.includes(s.PayMode?.trim());
+      const modeMatch = activePaymentModes.includes(s.PayMode?.trim()) || (showCancelledOrders && s.IsCancelled);
       const typeMatch =
         activeOrderTypes.length === 2 ||
         (s.OrderType
@@ -2209,7 +2211,7 @@ export default function SalesReport() {
                   <View style={styles.sidebarSection}>
                     <Text style={styles.sectionLabel}>PAYMENT MODES</Text>
                     <View style={styles.chipRow}>
-                      {["CASH", "CARD", "NETS", "PAYNOW"].map((m) => (
+                      {["CASH", "CARD", "NETS", "PAYNOW", "VOID"].map((m) => (
                         <TouchableOpacity
                           key={m}
                           onPress={() => togglePaymentMode(m)}
@@ -2324,7 +2326,7 @@ export default function SalesReport() {
                 <View style={styles.sidebarFooter}>
                   <TouchableOpacity
                     onPress={() => {
-                      setActivePaymentModes(["CASH", "CARD", "NETS", "PAYNOW"]);
+                      setActivePaymentModes(["CASH", "CARD", "NETS", "PAYNOW", "VOID"]);
                       setActiveOrderTypes(["DINE-IN", "TAKEAWAY"]);
                       setSortOrder("NEWEST");
                       setShowCancelledOrders(true);

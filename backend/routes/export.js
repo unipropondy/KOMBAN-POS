@@ -215,6 +215,23 @@ const generatePdfDocDefinition = (data) => {
     { text: (data.cancelledAmount || 0).toFixed(2), style: 'currencyValue', alignment: 'right', border: [1, 1, 1, 1], margin: [8, 5, 8, 5], color: '#c0392b' }
   ]);
 
+  // Section: Cancelled Orders Detail
+  if (Array.isArray(data.cancelledOrders) && data.cancelledOrders.length > 0) {
+    tableBody.push([
+      { text: 'Cancelled Bills Detail', style: 'sectionHeader', fillColor: '#f8d7da', border: [1, 1, 1, 1], margin: [8, 5, 8, 5], colSpan: 3 },
+      {},
+      {}
+    ]);
+    
+    data.cancelledOrders.forEach(order => {
+      tableBody.push([
+        { text: `Bill: ${order.BillNo}\nReason: ${order.CancellationReason || 'N/A'}`, style: 'rowLabel', border: [1, 1, 1, 1], margin: [8, 5, 8, 5], fontSize: 9 },
+        { text: String(order.VoidItemQty || 0), alignment: 'center', border: [1, 1, 1, 1], margin: [8, 5, 8, 5] },
+        { text: (order.OriginalAmount || 0).toFixed(2), style: 'currencyValue', alignment: 'right', border: [1, 1, 1, 1], margin: [8, 5, 8, 5], color: '#c0392b' }
+      ]);
+    });
+  }
+
   // Add the table to content
   content.push({
     table: {

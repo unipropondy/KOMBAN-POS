@@ -568,6 +568,25 @@ router.get("/day-end-summary", async (req, res) => {
         ORDER BY SysAmount DESC
       `);
 
+    // D. Cancelled Orders List
+    const cancelledOrdersRes = await pool.request()
+      .input("start", sql.VarChar, start)
+      .input("end", sql.VarChar, end)
+      .query(`
+        SELECT 
+          sh.BillNo, 
+          sh.CancellationReason, 
+          sh.CancelledDate, 
+          sh.CancelledByUserName,
+          sh.SubTotal as OriginalAmount,
+          sh.VoidItemQty
+        FROM SettlementHeader sh
+        WHERE CAST(sh.LastSettlementDate AS DATE) >= @start
+          AND CAST(sh.LastSettlementDate AS DATE) <= @end
+          AND sh.IsCancelled = 1
+        ORDER BY sh.LastSettlementDate DESC
+      `);
+
     res.json({
       success: true,
       orgInfo,
@@ -575,6 +594,7 @@ router.get("/day-end-summary", async (req, res) => {
       refNo: analysis.RefNo,
       paymodeDetail: paymodes,
       settlementBreakdown: settlementRes.recordset,
+      cancelledOrders: cancelledOrdersRes.recordset,
       settlementDetail: {
         cashTotal,
         otherTotal
