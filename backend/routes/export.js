@@ -203,11 +203,16 @@ const generatePdfDocDefinition = (data) => {
     {},
     {}
   ]);
-  
   tableBody.push([
     { text: 'Total Void Items', style: 'rowLabel', border: [1, 1, 1, 1], margin: [8, 5, 8, 5] },
     { text: String(data.voidQty || 0), alignment: 'center', border: [1, 1, 1, 1], margin: [8, 5, 8, 5] },
     { text: (data.voidAmount || 0).toFixed(2), style: 'currencyValue', alignment: 'right', border: [1, 1, 1, 1], margin: [8, 5, 8, 5], color: '#c0392b' }
+  ]);
+  
+  tableBody.push([
+    { text: 'Total Cancelled Bills', style: 'rowLabel', border: [1, 1, 1, 1], margin: [8, 5, 8, 5] },
+    { text: String(data.cancelledCount || 0), alignment: 'center', border: [1, 1, 1, 1], margin: [8, 5, 8, 5] },
+    { text: (data.cancelledAmount || 0).toFixed(2), style: 'currencyValue', alignment: 'right', border: [1, 1, 1, 1], margin: [8, 5, 8, 5], color: '#c0392b' }
   ]);
 
   // Add the table to content

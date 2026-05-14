@@ -469,6 +469,8 @@ router.get("/day-end-summary", async (req, res) => {
           COUNT(SettlementID) as TotalBills,
           SUM(ISNULL(VoidItemQty, 0)) as VoidQty,
           SUM(ISNULL(VoidItemAmount, 0)) as VoidAmount,
+          SUM(CASE WHEN IsCancelled = 1 THEN 1 ELSE 0 END) as CancelledCount,
+          SUM(CASE WHEN IsCancelled = 1 THEN ISNULL(VoidItemAmount, 0) ELSE 0 END) as CancelledAmount,
           MAX(TerminalCode) as TerminalCode,
           MAX(RefNo) as RefNo
         FROM SettlementHeader
@@ -591,6 +593,10 @@ router.get("/day-end-summary", async (req, res) => {
       voidDetail: {
         voidQty: analysis.VoidQty || 0,
         voidAmount: analysis.VoidAmount || 0
+      },
+      cancelledDetail: {
+        count: analysis.CancelledCount || 0,
+        amount: analysis.CancelledAmount || 0
       }
     });
   } catch (err) {

@@ -522,6 +522,9 @@ export default function SalesReport() {
         voidQty: vd.voidQty || 0,
         voidAmount: vd.voidAmount || 0,
         
+        cancelledCount: summaryData.cancelledDetail?.count || 0,
+        cancelledAmount: summaryData.cancelledDetail?.amount || 0,
+        
         paymentBreakdown,
         items: items.length > 0 ? items.map(i => ({
           name: i.name,
@@ -813,7 +816,7 @@ export default function SalesReport() {
       (acc, s) => {
         if (s.IsCancelled) {
           acc.CancelledCount += 1;
-          acc.CancelledAmount += s.SysAmount || 0;
+          acc.CancelledAmount += s.VoidAmount || 0;
           return acc;
         }
 
