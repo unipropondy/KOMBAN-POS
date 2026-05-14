@@ -1,0 +1,63 @@
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Expo
+# =========================
+.expo/
+.expo-shared/
+web-build/
+dist/
+expo-env.d.ts
+
+# =========================
+# EAS Build
+# =========================
+.eas/
+
+# =========================
+# Native (managed workflow)
+# =========================
+/android
+/ios
+.kotlin/
+
+# =========================
+# Environment files (IMPORTANT)
+# =========================
+.env
+.env.*
+
+# =========================
+# Certificates / Keys (sensitive)
+# =========================
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# =========================
+# Metro / React Native
+# =========================
+.metro-health-check*
+
+# =========================
+# Debug logs
+# =========================
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# =========================
+# macOS
+# =========================
+.DS_Store
+
+# =========================
+# TypeScript
+# =========================
+*.tsbuildinfo
