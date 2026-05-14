@@ -518,7 +518,7 @@ router.post("/send", async (req, res) => {
             d.OrderDetailId as lineItemId, d.DishId as id, dish.Name as name,
             d.Quantity as qty, d.PricePerUnit as price, d.StatusCode, 
             d.ModifiersJSON, d.Remarks as note, d.isTakeAway as isTakeaway,
-            ISNULL(ckt.KitchenTypeCode, '0') as KitchenTypeCode, 
+            ISNULL(ckt.KitchenTypeCode, '2') as KitchenTypeCode, 
             ISNULL(ISNULL(ckt.KitchenTypeName, cat.CategoryName), 'KITCHEN') as KitchenTypeName,
             pm.PrinterPath as PrinterIP
             FROM RestaurantOrderDetailCur d
@@ -527,7 +527,10 @@ router.post("/send", async (req, res) => {
             LEFT JOIN DishGroupMaster dgm ON dish.DishGroupId = dgm.DishGroupId
             LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
             LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
-            LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50))
+            LEFT JOIN (
+              SELECT *, ROW_NUMBER() OVER(PARTITION BY KitchenTypeValue ORDER BY PrinterId) as rn 
+              FROM PrintMaster WHERE IsActive = 1
+            ) pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.rn = 1
             WHERE (LTRIM(RTRIM(h.Tableno)) = (SELECT LTRIM(RTRIM(TableNumber)) FROM TableMaster WHERE TableId = @tableNo)
               OR LTRIM(RTRIM(h.Tableno)) = LTRIM(RTRIM(@tableNo))) 
               AND (h.isOrderClosed = 0 OR h.isOrderClosed IS NULL) 
@@ -626,7 +629,7 @@ router.get("/cart/:tableId", async (req, res) => {
             WHEN 4 THEN 'SERVED' WHEN 5 THEN 'HOLD' WHEN 0 THEN 'VOIDED' 
             ELSE 'SENT' 
           END as status,
-          ISNULL(ckt.KitchenTypeCode, '0') as KitchenTypeCode, 
+          ISNULL(ckt.KitchenTypeCode, '2') as KitchenTypeCode, 
           ISNULL(ISNULL(ckt.KitchenTypeName, cat.CategoryName), 'KITCHEN') as KitchenTypeName,
           pm.PrinterPath as PrinterIP
         FROM RestaurantOrderDetailCur d 
@@ -635,7 +638,10 @@ router.get("/cart/:tableId", async (req, res) => {
         LEFT JOIN DishGroupMaster dgm ON dish.DishGroupId = dgm.DishGroupId
         LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
         LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
-        LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50))
+        LEFT JOIN (
+          SELECT *, ROW_NUMBER() OVER(PARTITION BY KitchenTypeValue ORDER BY PrinterId) as rn 
+          FROM PrintMaster WHERE IsActive = 1
+        ) pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.rn = 1
         WHERE 
           h.isOrderClosed = 0
           AND d.StatusCode <> 0 -- 🚀 SHIELD: Never fetch voided items back into the active cart

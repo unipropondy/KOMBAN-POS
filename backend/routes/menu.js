@@ -66,14 +66,17 @@ router.get("/dishes/all", async (req, res) => {
         d.DishId, d.Name, d.DishGroupId, d.currentcost AS Price,
         d.DishCode, d.Description,
         d.Imageid AS Image, CASE WHEN d.Imageid IS NOT NULL THEN 1 ELSE 0 END AS HasImage,
-        ISNULL(ckt.KitchenTypeCode, '0') as KitchenTypeCode,
+        ISNULL(ckt.KitchenTypeCode, '2') as KitchenTypeCode,
         ISNULL(ISNULL(ckt.KitchenTypeName, cat.CategoryName), 'KITCHEN') as KitchenTypeName,
         pm.PrinterPath AS PrinterIP
       FROM DishMaster d
       LEFT JOIN DishGroupMaster dgm ON d.DishGroupId = dgm.DishGroupId
       LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
       LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
-      LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS INT) = pm.KitchenTypeValue
+      LEFT JOIN (
+        SELECT *, ROW_NUMBER() OVER(PARTITION BY KitchenTypeValue ORDER BY PrinterId) as rn 
+        FROM PrintMaster WHERE IsActive = 1
+      ) pm ON CAST(ckt.KitchenTypeCode AS INT) = pm.KitchenTypeValue AND pm.rn = 1
       WHERE d.IsActive = 1 ORDER BY d.Name ASC
     `);
     setCache("dishes_all", result.recordset);
@@ -93,14 +96,17 @@ router.get("/dishes/group/:DishGroupId", async (req, res) => {
         d.DishId, d.Name, d.DishGroupId, d.currentcost AS Price,
         d.DishCode, d.Description,
         d.Imageid AS Image, CASE WHEN d.Imageid IS NOT NULL THEN 1 ELSE 0 END AS HasImage,
-        ISNULL(ckt.KitchenTypeCode, '0') as KitchenTypeCode,
+        ISNULL(ckt.KitchenTypeCode, '2') as KitchenTypeCode,
         ISNULL(ISNULL(ckt.KitchenTypeName, cat.CategoryName), 'KITCHEN') as KitchenTypeName,
         pm.PrinterPath AS PrinterIP
       FROM DishMaster d
       LEFT JOIN DishGroupMaster dgm ON d.DishGroupId = dgm.DishGroupId
       LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
       LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
-      LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS INT) = pm.KitchenTypeValue
+      LEFT JOIN (
+        SELECT *, ROW_NUMBER() OVER(PARTITION BY KitchenTypeValue ORDER BY PrinterId) as rn 
+        FROM PrintMaster WHERE IsActive = 1
+      ) pm ON CAST(ckt.KitchenTypeCode AS INT) = pm.KitchenTypeValue AND pm.rn = 1
       WHERE d.IsActive = 1 
       AND d.DishGroupId = @DishGroupId ORDER BY d.Name ASC
       `);
