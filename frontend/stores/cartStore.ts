@@ -1054,6 +1054,24 @@ export const useCartStore = create<CartState>()(
       storage: createJSONStorage(() => 
         Platform.OS === 'web' ? window.sessionStorage : AsyncStorage
       ),
+      partialize: (state) => ({
+        carts: state.carts,
+        discounts: state.discounts,
+        tableOrderIds: state.tableOrderIds,
+        currentContextId: state.currentContextId,
+        lastLocalUpdate: state.lastLocalUpdate,
+        lastServerSync: state.lastServerSync,
+        deletedItemsShield: state.deletedItemsShield,
+        operationVersion: state.operationVersion,
+      }),
+      merge: (persistedState: any, currentState) => {
+        const merged = { ...currentState, ...persistedState };
+        // 🛡️ RECOVERY: Ensure deletingItems is always a Set (not a plain object from storage)
+        if (!(merged.deletingItems instanceof Set)) {
+          merged.deletingItems = new Set();
+        }
+        return merged;
+      },
     }
   )
 );
