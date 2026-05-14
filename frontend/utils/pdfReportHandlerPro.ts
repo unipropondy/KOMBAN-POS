@@ -9,8 +9,10 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 
+import { API_URL } from '@/constants/Config';
+
 // API configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_BASE_URL = API_URL;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // ms
 const TIMEOUT = 30000; // ms
@@ -96,13 +98,13 @@ class PdfReportClient {
     return this.executeWithRetry(async () => {
       const endpoint = '/sales/consolidated-report/download';
       const filename = `${generateReportFilename(filter, new Date(date))}.pdf`;
-      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      const fileUri = `${(FileSystem as any).documentDirectory}${filename}`;
 
       // Check if file already exists
       const fileInfo = await FileSystem.getInfoAsync(fileUri);
       if (fileInfo.exists) {
         console.log(`[PDF Download] Using cached file: ${filename}`);
-        return { uri: fileUri, filename, size: fileInfo.size || 0 };
+        return { uri: fileUri, filename, size: (fileInfo as any).size || 0 };
       }
 
       // Download file
@@ -118,16 +120,16 @@ class PdfReportClient {
 
       // Save to device
       await FileSystem.writeAsStringAsync(fileUri, Buffer.from(response.data).toString('base64'), {
-        encoding: FileSystem.EncodingType.Base64
+        encoding: (FileSystem as any).EncodingType.Base64
       });
 
       const savedFileInfo = await FileSystem.getInfoAsync(fileUri);
-      console.log(`[PDF Download] Saved: ${filename} (${savedFileInfo.size} bytes)`);
+      console.log(`[PDF Download] Saved: ${filename} (${(savedFileInfo as any).size} bytes)`);
 
       return {
         uri: fileUri,
         filename,
-        size: savedFileInfo.size || 0
+        size: (savedFileInfo as any).size || 0
       };
     }, '/consolidated-report/download');
   }
@@ -240,12 +242,12 @@ class PdfReportClient {
    */
   async clearCache(): Promise<number> {
     try {
-      const files = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory!);
+      const files = await FileSystem.readDirectoryAsync((FileSystem as any).documentDirectory!);
       let cleared = 0;
 
       for (const file of files) {
         if (file.startsWith('Sales_Report_') && file.endsWith('.pdf')) {
-          await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${file}`);
+          await FileSystem.deleteAsync(`${(FileSystem as any).documentDirectory}${file}`);
           cleared++;
         }
       }
@@ -263,15 +265,15 @@ class PdfReportClient {
    */
   async getCacheInfo(): Promise<{ count: number; size: number }> {
     try {
-      const files = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory!);
+      const files = await FileSystem.readDirectoryAsync((FileSystem as any).documentDirectory!);
       let totalSize = 0;
       let count = 0;
 
       for (const file of files) {
         if (file.startsWith('Sales_Report_') && file.endsWith('.pdf')) {
-          const fileInfo = await FileSystem.getInfoAsync(`${FileSystem.documentDirectory}${file}`);
-          if (fileInfo.size) {
-            totalSize += fileInfo.size;
+          const fileInfo = await FileSystem.getInfoAsync(`${(FileSystem as any).documentDirectory}${file}`);
+          if ((fileInfo as any).size) {
+            totalSize += (fileInfo as any).size;
             count++;
           }
         }

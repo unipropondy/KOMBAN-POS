@@ -47,7 +47,7 @@ export function useGlobalSocketSync() {
       const tableId = data.tableId || data.tableid;
       if (!tableId) return;
 
-      console.log(`[TRACE] [${now}] [SOCKET_RECEIVE] table_status_updated | Table: ${tableId} | Status: ${data.status}`);
+      console.log(`🔌 [Table] Status Update | Table: ${tableId} | Status: ${data.status}`);
 
       const status = data.status !== undefined ? data.status : data.Status;
       const totalAmount = data.totalAmount !== undefined ? data.totalAmount : data.TotalAmount;
@@ -139,19 +139,14 @@ export function useGlobalSocketSync() {
 
     // --- 6. INSTANT CART SYNC (Socket-First) ---
     const handleCartChange = (payload: { tableId: string; contextId: string; items: any[]; lastUpdate: number; version?: number }) => {
-      const now = Date.now();
-      console.log(`[TRACE] [${now}] [${payload.contextId}] socket.on: cart_change | Items: ${payload.items.length} | PayloadVersion: ${payload.version || 'NONE'}`);
-
       const store = useCartStore.getState();
       const currentLastUpdate = store.lastLocalUpdate[payload.contextId] || 0;
 
       // 🛡️ SYNC SHIELD: Only update if the socket data is NEWER than our last local edit
       if (payload.lastUpdate <= currentLastUpdate) {
-        console.log(`🛡️ [TRACE] [${now}] [${payload.contextId}] socket.on: cart_change | ABORTED (Stale: ${payload.lastUpdate} <= ${currentLastUpdate})`);
         return;
       }
 
-      console.log(`⚡ [TRACE] [${now}] [${payload.contextId}] socket.on: cart_change | APPLYING`);
       store.setCartItems(payload.contextId, payload.items, true, "SOCKET_CHANGE");
     };
 

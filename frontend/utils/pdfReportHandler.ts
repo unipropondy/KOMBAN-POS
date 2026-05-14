@@ -8,8 +8,11 @@ import * as FileSystem from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { Alert, Platform } from 'react-native';
+import { Buffer } from 'buffer';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+import { API_URL } from '@/constants/Config';
+
+const API_BASE_URL = API_URL;
 
 /**
  * Download consolidated sales report PDF
@@ -17,7 +20,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/a
  * @param {string} date - Optional specific date (YYYY-MM-DD format)
  * @returns {Promise<void>}
  */
-export const downloadSalesReportPdf = async (filter = 'daily', date = null) => {
+export const downloadSalesReportPdf = async (filter: string = 'daily', date: string | null = null) => {
   try {
     // Build API URL
     let url = `${API_BASE_URL}/sales/consolidated-report/pdf?filter=${filter}`;
@@ -39,14 +42,14 @@ export const downloadSalesReportPdf = async (filter = 'daily', date = null) => {
 
     // Save to file system
     const fileName = `Sales_Report_${filter}_${new Date().toISOString().split('T')[0]}.pdf`;
-    const fileUri = `${FileSystem.DocumentDirectoryPath}/${fileName}`;
+    const fileUri = `${(FileSystem as any).documentDirectory}${fileName}`;
 
     console.log('[PDF Download] Saving to:', fileUri);
 
     await FileSystem.writeAsStringAsync(
       fileUri,
       Buffer.from(response.data).toString('base64'),
-      { encoding: FileSystem.EncodingType.Base64 }
+      { encoding: (FileSystem as any).EncodingType.Base64 }
     );
 
     console.log('[PDF Download] File saved successfully');
@@ -66,7 +69,7 @@ export const downloadSalesReportPdf = async (filter = 'daily', date = null) => {
         [{ text: 'OK', onPress: () => {} }]
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('[PDF Download] Error:', error.message);
     Alert.alert(
       'Download Failed',
@@ -83,7 +86,7 @@ export const downloadSalesReportPdf = async (filter = 'daily', date = null) => {
  * @param {string} date - Optional specific date (YYYY-MM-DD format)
  * @returns {Promise<{success: boolean, message: string}>}
  */
-export const emailSalesReportPdf = async (recipientEmail, filter = 'daily', date = null) => {
+export const emailSalesReportPdf = async (recipientEmail: string, filter: string = 'daily', date: string | null = null) => {
   try {
     if (!recipientEmail || !recipientEmail.includes('@')) {
       throw new Error('Please provide a valid email address');
@@ -120,7 +123,7 @@ export const emailSalesReportPdf = async (recipientEmail, filter = 'daily', date
     } else {
       throw new Error(response.data?.error || 'Failed to send email');
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('[PDF Email] Error:', error.message);
     return {
       success: false,
@@ -135,7 +138,7 @@ export const emailSalesReportPdf = async (recipientEmail, filter = 'daily', date
  * @param {string} date - Optional specific date
  * @returns {string} Period description
  */
-export const getPeriodString = (filter = 'daily', date = null) => {
+export const getPeriodString = (filter: string = 'daily', date: string | null = null) => {
   const today = new Date();
   const todayStr = today.toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -184,7 +187,7 @@ export const getPeriodString = (filter = 'daily', date = null) => {
  * @param {string} date - Optional specific date
  * @returns {Promise<void>}
  */
-export const previewSalesReportPdf = async (filter = 'daily', date = null) => {
+export const previewSalesReportPdf = async (filter: string = 'daily', date: string | null = null) => {
   try {
     if (Platform.OS === 'web') {
       // On web, open in new tab
@@ -208,12 +211,12 @@ export const previewSalesReportPdf = async (filter = 'daily', date = null) => {
     });
 
     const fileName = `Sales_Report_${filter}_${new Date().toISOString().split('T')[0]}.pdf`;
-    const fileUri = `${FileSystem.DocumentDirectoryPath}/${fileName}`;
+    const fileUri = `${(FileSystem as any).documentDirectory}${fileName}`;
 
     await FileSystem.writeAsStringAsync(
       fileUri,
       Buffer.from(response.data).toString('base64'),
-      { encoding: FileSystem.EncodingType.Base64 }
+      { encoding: (FileSystem as any).EncodingType.Base64 }
     );
 
     // Open with default PDF viewer
@@ -231,7 +234,7 @@ export const previewSalesReportPdf = async (filter = 'daily', date = null) => {
         await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf' });
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('[PDF Preview] Error:', error.message);
     Alert.alert(
       'Preview Failed',

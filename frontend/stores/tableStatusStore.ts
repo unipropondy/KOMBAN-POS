@@ -59,11 +59,14 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
       const now = Date.now();
       const lastEdit = state.lastLocalUpdate[key] || 0;
 
-      // 🛡️ SYNC SHIELD: Prioritize modifiedOn (Version Check) over simple timer
       if (isExternal) {
-        // If we have timestamps, use them for definitive versioning
-        if (modifiedOn && lastModified && modifiedOn <= lastModified) {
-          return state; // Stale update
+        // 🛡️ SYNC SHIELD: Prioritize modifiedOn (Version Check) over simple timer
+        if (modifiedOn && lastModified) {
+          const incomingTime = new Date(modifiedOn).getTime();
+          const existingTime = new Date(lastModified).getTime();
+          if (!isNaN(incomingTime) && !isNaN(existingTime) && incomingTime <= existingTime) {
+            return state; // Stale update
+          }
         }
         // Fallback to simple timer for actions without timestamps
         if (!modifiedOn && now - lastEdit < 3000) return state;
