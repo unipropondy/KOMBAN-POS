@@ -376,7 +376,8 @@ async function syncTableStatus(req, tableId) {
       CASE 
         WHEN Status = 3 AND ModifiedOn IS NOT NULL AND DATEDIFF(MINUTE, ModifiedOn, GETDATE()) >= ISNULL((SELECT TOP 1 HoldOvertimeMinutes FROM CompanySettings), 30) THEN 1 
         ELSE 0 
-      END AS isHoldOvertime
+      END AS isHoldOvertime,
+      CONVERT(VARCHAR, ModifiedOn, 126) as ModifiedOn
     FROM TableMaster WHERE TableId = @tid;
   `);
 
@@ -396,6 +397,7 @@ async function syncTableStatus(req, tableId) {
       currentOrderId: cleanOrderId,
       tableNo: updated.tableNo,
       section: sectionMap[String(updated.section)] || updated.section,
+      modifiedOn: updated.ModifiedOn,
       isOvertime: updated.isOvertime || 0,
       isHoldOvertime: updated.isHoldOvertime || 0
     });
@@ -748,7 +750,42 @@ router.post("/cancel", async (req, res) => {
           `);
       }
 
-      // 4. Update Current Tables (StatusCode 4 = Cancelled)
+      // 4. Insert into supporting Settlement tables for reporting (Audit Trail)
+      await transaction.request()
+        .input("sid", sql.UniqueIdentifier, settlementId)
+        .input("oid", sql.NVarChar(50), orderId)
+        .input("bizId", sql.UniqueIdentifier, header.BusinessUnitId || DEFAULT_GUID)
+        .input("userId", sql.UniqueIdentifier, toGuidOrNull(userId))
+        .input("subTotal", sql.Money, subTotal)
+        .input("voidQty", sql.Int, voidQty)
+        .query(`
+          -- Insert into SettlementTotalSales (Zeroed)
+          INSERT INTO SettlementTotalSales (SettlementID, PayMode, SysAmount, ManualAmount, AmountDiff, ReceiptCount)
+          VALUES (@sid, 'VOID', 0, 0, 0, @voidQty);
+
+          -- Insert into SettlementDetail (Zeroed)
+          INSERT INTO SettlementDetail (SettlementId, Paymode, SysAmount, ManualAmount, SortageOrExces, ReceiptCount, IsCollected)
+          VALUES (@sid, 'VOID', 0, 0, 0, @voidQty, 0);
+
+          -- Insert into SettlementTranDetail (Zeroed)
+          INSERT INTO SettlementTranDetail (SettlementID, PayMode, CashIn, CashOut)
+          VALUES (@sid, 'VOID', 0, 0);
+
+          -- Insert into RestaurantInvoice (Cancelled Status 4)
+          INSERT INTO RestaurantInvoice (
+            BusinessUnitId, RestaurantBillId, OrderId, BillNumber, OrderDateTime, TimeBilled, 
+            TotalLineItemAmount, TotalTax, DiscountAmount, TotalAmount, StatusCode, 
+            CreatedBy, CreatedOn, InvoiceDate, ServiceCharge, RoundedBy, TotalAmountLessFreight,
+            PaymentTermCode
+          ) VALUES (
+            @bizId, @sid, @sid, @oid, GETDATE(), GETDATE(),
+            @subTotal, 0, 0, 0, 4,
+            @userId, GETDATE(), CAST(GETDATE() AS DATE), 0, 0, @subTotal,
+            0
+          );
+        `);
+
+      // 5. Update Current Tables (StatusCode 4 = Cancelled)
       await transaction.request()
         .input("oid", sql.NVarChar(50), orderId)
         .query(`

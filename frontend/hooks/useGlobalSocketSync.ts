@@ -82,7 +82,8 @@ export function useGlobalSocketSync() {
           lockedByName,
           totalAmount,
           true, 
-          isHoldOvertime
+          isHoldOvertime,
+          data.modifiedOn || data.ModifiedOn
         );
       }
 

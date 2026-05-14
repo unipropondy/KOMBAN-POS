@@ -11,6 +11,7 @@ export type TableStatus = {
   lockedByName?: string;
   totalAmount?: number;
   isHoldOvertime?: boolean;
+  lastModified?: string;
 };
 
 type TableStatusState = {
@@ -29,7 +30,8 @@ type TableStatusState = {
     lockedByName?: string,
     totalAmount?: number,
     isExternal?: boolean,
-    isHoldOvertime?: boolean
+    isHoldOvertime?: boolean,
+    modifiedOn?: string
   ) => void;
   clearTable: (section: string, tableNo: string) => void;
   lockTable: (tableId: string, lockedByName?: string) => void;
@@ -49,15 +51,23 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
   lockedTableNames: {},
   lastLocalUpdate: {},
 
-  updateTableStatus: (tableId, section, tableNo, orderId, status, startTime, lockedByName, totalAmount, isExternal, isHoldOvertime) => {
+  updateTableStatus: (tableId, section, tableNo, orderId, status, startTime, lockedByName, totalAmount, isExternal, isHoldOvertime, modifiedOn) => {
     const cleanTableId = String(tableId || "").replace(/^\{|\}$/g, "").trim().toLowerCase();
     const key = `${section}_${tableNo}`;
     set((state) => {
+      const lastModified = state.tableMap[cleanTableId]?.lastModified || "";
       const now = Date.now();
       const lastEdit = state.lastLocalUpdate[key] || 0;
 
-      // 🛡️ SYNC SHIELD: Ignore stale external updates
-      if (isExternal && now - lastEdit < 3000) return state;
+      // 🛡️ SYNC SHIELD: Prioritize modifiedOn (Version Check) over simple timer
+      if (isExternal) {
+        // If we have timestamps, use them for definitive versioning
+        if (modifiedOn && lastModified && modifiedOn <= lastModified) {
+          return state; // Stale update
+        }
+        // Fallback to simple timer for actions without timestamps
+        if (!modifiedOn && now - lastEdit < 3000) return state;
+      }
 
       const parsedStartTime = typeof startTime === 'string' 
         ? new Date(startTime).getTime() 
@@ -78,6 +88,7 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
         lockedByName,
         totalAmount: totalAmount !== undefined ? totalAmount : (existingIndex > -1 ? state.tables[existingIndex].totalAmount : 0),
         isHoldOvertime: isHoldOvertime !== undefined ? isHoldOvertime : (existingIndex > -1 ? state.tables[existingIndex].isHoldOvertime : false),
+        lastModified: modifiedOn || (existingIndex > -1 ? state.tables[existingIndex].lastModified : ""),
       };
 
       const newTables = [...state.tables];
@@ -221,11 +232,18 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
 
       updates.forEach((update) => {
         const cleanUpdateId = String(update.tableId || "").replace(/^\{|\}$/g, "").trim().toLowerCase();
+        const existingTable = newMap[cleanUpdateId];
+        
+        // 🛡️ SYNC SHIELD: Only update if incoming data is NEWER
+        if (update.lastModified && existingTable?.lastModified && update.lastModified <= existingTable.lastModified) {
+          return;
+        }
+
         const key = `${update.section}_${update.tableNo}`;
         const lastEdit = state.lastLocalUpdate[key] || 0;
 
-        // 🛡️ SYNC SHIELD: Ignore stale background updates
-        if (now - lastEdit < 3000) return;
+        // 🛡️ SYNC SHIELD: Ignore stale background updates if recently edited locally
+        if (now - lastEdit < 3000 && !update.lastModified) return;
 
         const existingIndex = newTables.findIndex(
           (t) => (String(t.tableId || "").replace(/^\{|\}$/g, "").trim().toLowerCase() === cleanUpdateId && !!cleanUpdateId) || (t.section === update.section && t.tableNo === update.tableNo)

@@ -75,7 +75,8 @@ router.get("/all", async (req, res) => {
       CASE 
         WHEN Status = 3 AND ModifiedOn IS NOT NULL AND DATEDIFF(MINUTE, ModifiedOn, GETDATE()) >= ISNULL((SELECT TOP 1 HoldOvertimeMinutes FROM CompanySettings), 30) THEN 1 
         ELSE 0 
-      END AS isHoldOvertime
+      END AS isHoldOvertime,
+      CONVERT(VARCHAR, ModifiedOn, 126) as ModifiedOn
       FROM TableMaster
     `;
 
@@ -223,6 +224,7 @@ router.put("/status", async (req, res) => {
         CONVERT(VARCHAR, INSERTED.StartTime, 126) AS StartTime,
         INSERTED.TableNumber,
         INSERTED.DiningSection,
+        CONVERT(VARCHAR, INSERTED.ModifiedOn, 126) AS ModifiedOn,
         CASE 
           WHEN INSERTED.Status IN (1, 2, 3) AND INSERTED.StartTime IS NOT NULL AND INSERTED.StartTime > '2000-01-01' AND DATEDIFF(MINUTE, INSERTED.StartTime, GETDATE()) >= 60 THEN 1 
           ELSE 0 
@@ -257,6 +259,7 @@ router.put("/status", async (req, res) => {
         startTime: currentStartTime,
         tableNo: row?.TableNumber,
         section: sectionMap[String(row?.DiningSection)] || row?.DiningSection,
+        modifiedOn: row?.ModifiedOn,
         isOvertime: currentIsOvertime,
         isHoldOvertime: row?.isHoldOvertime || 0
       });
@@ -319,6 +322,7 @@ router.put("/:tableId/status", async (req, res) => {
         .input("tableId", sql.VarChar(50), cleanTableId)
         .query(`
           SELECT TableNumber, DiningSection, TotalAmount, CONVERT(VARCHAR, StartTime, 126) AS StartTime,
+          CONVERT(VARCHAR, ModifiedOn, 126) AS ModifiedOn,
           CASE 
             WHEN Status IN (1, 2, 3) AND StartTime IS NOT NULL AND StartTime > '2000-01-01' AND DATEDIFF(MINUTE, StartTime, GETDATE()) >= 60 THEN 1 
             ELSE 0 
@@ -339,6 +343,7 @@ router.put("/:tableId/status", async (req, res) => {
         startTime: row?.StartTime || null,
         tableNo: row?.TableNumber,
         section: sectionMap[String(row?.DiningSection)] || row?.DiningSection,
+        modifiedOn: row?.ModifiedOn,
         isOvertime: row?.isOvertime || 0,
         isHoldOvertime: row?.isHoldOvertime || 0
       });

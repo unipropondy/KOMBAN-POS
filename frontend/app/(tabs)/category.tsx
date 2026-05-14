@@ -429,13 +429,13 @@ export default function Category() {
     }, []),
   );
 
-  // --- Real-time Sync (Polling every 15s as backup) ---
+  // --- Real-time Sync (Polling every 120s as backup) ---
   useEffect(() => {
     const interval = setInterval(() => {
       fetchTables();
-    }, 60000); 
+    }, 120000); 
     return () => clearInterval(interval);
-  }, [allTables.length]); 
+  }, []); 
 
   const fetchLockedTables = async () => {
     try {
@@ -498,39 +498,18 @@ export default function Category() {
             currentOrderId: item.currentOrderId,
             isOvertime: Number(item.isOvertime) || 0,
             isHoldOvertime: Number(item.isHoldOvertime) || 0,
+            lastModified: item.ModifiedOn,
           }))
         
         const uniqueTables = convertedData.filter((item, index, self) =>
           index === self.findIndex(t => t.id === item.id)
         );
 
-        // 🛡️ SYNC SHIELD: Merge incoming API data with store data if a local update is recent
-        const currentStore = useTableStatusStore.getState();
-        const now = Date.now();
-        
-        const mergedTables = uniqueTables.map(t => {
-          const section = getSectionFromDiningSection(t.DiningSection);
-          const key = `${section}_${t.label}`;
-          const lastEdit = currentStore.lastLocalUpdate[key] || 0;
-
-          if (now - lastEdit < 3000) {
-            const storeTable = currentStore.tables.find(st => st.tableId === t.id);
-            if (storeTable && storeTable.status !== 'EMPTY') {
-              const statusMap: Record<string, number> = {
-                'EMPTY': 0, 'SENT': 1, 'BILL_REQUESTED': 2, 'HOLD': 3, 'OVERTIME': 4, 'LOCKED': 5
-              };
-              return {
-                ...t,
-                Status: statusMap[storeTable.status as string] ?? 1,
-                totalAmount: storeTable.totalAmount || t.totalAmount,
-                StartTime: storeTable.startTime || t.StartTime
-              };
-            }
-          }
-          return t;
+        setAllTables(prev => {
+          if (prev.length !== uniqueTables.length) return uniqueTables;
+          const isSame = prev.every((t, i) => t.id === uniqueTables[i].id && t.label === uniqueTables[i].label);
+          return isSame ? prev : uniqueTables;
         });
-
-        setAllTables(mergedTables);
 
         // 🚀 BATCH SYNC to global store (MUCH FASTER)
         const updates = uniqueTables.map(t => {
@@ -552,7 +531,8 @@ export default function Category() {
             startTime: finalStartTime,
             lockedByName: t.lockedByName,
             totalAmount: t.totalAmount,
-            isHoldOvertime: t.isHoldOvertime === 1 || !!t.isHoldOvertime
+            isHoldOvertime: t.isHoldOvertime === 1 || !!t.isHoldOvertime,
+            lastModified: (t as any).lastModified
           };
         });
 
@@ -724,7 +704,8 @@ export default function Category() {
     try {
       const res = await useCartStore.getState().checkoutOrder(id);
       if (res && res.success) {
-        fetchTables();
+        // Rely on socket sync for status updates
+        // fetchTables();
         const targetTable = allTables.find(t => t.id === id);
         if (targetTable) {
           const section = getSectionFromDiningSection(targetTable.DiningSection);
@@ -753,7 +734,8 @@ export default function Category() {
     try {
       const res = await (useCartStore.getState() as any).completeOrder(id);
       if (res && res.success) {
-        fetchTables();
+        // Rely on socket sync for status updates
+        // fetchTables();
         useActiveOrdersStore.getState().fetchActiveKitchenOrders();
         showToast({ type: "success", message: "Completed", subtitle: "Table is now available." });
       }

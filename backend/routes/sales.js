@@ -1176,7 +1176,7 @@ router.get("/consolidated-report/pdf", async (req, res) => {
       FROM SettlementHeader sh
       LEFT JOIN SettlementItemDetail sid ON sh.SettlementID = sid.SettlementID
       LEFT JOIN SettlementTotalSales sts ON sh.SettlementID = sts.SettlementID
-      WHERE sh.IsCancelled = 0 AND ${dateWhereClause}
+      WHERE ${dateWhereClause}
     `);
 
     const aggregateData = aggregateResult.recordset[0] || {};
@@ -1188,7 +1188,7 @@ router.get("/consolidated-report/pdf", async (req, res) => {
         SUM(CAST(ISNULL(sts.SysAmount, 0) AS DECIMAL(18,2))) as Amount
       FROM SettlementHeader sh
       LEFT JOIN SettlementTotalSales sts ON sh.SettlementID = sts.SettlementID
-      WHERE sh.IsCancelled = 0 AND ${dateWhereClause}
+      WHERE ${dateWhereClause}
       GROUP BY ${normalizeReportPayModeSql("sts.PayMode")}
     `);
 
