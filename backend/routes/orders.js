@@ -244,7 +244,7 @@ async function syncToProfessionalTables(transaction, tableId, displayOrderId, it
     itemRequest.input(p_cost, sql.Decimal(18, 2), unitPrice);
     itemRequest.input(p_status, sql.Int, currentStatusCode);
     itemRequest.input(p_name, sql.NVarChar(200), dishName);
-    itemRequest.input(p_note, sql.NVarChar(300), noteInfo.value);
+    itemRequest.input(p_note, sql.NVarChar(sql.MAX), noteInfo.value);
     itemRequest.input(p_mods, sql.NVarChar(sql.MAX), modsJSON);
     itemRequest.input(p_tw, sql.Bit, takeawayInfo.value ? 1 : 0);
 
@@ -326,11 +326,12 @@ async function syncTableStatus(req, tableId) {
     
     SELECT TOP 1 @TableNo = LTRIM(RTRIM(TableNumber)) FROM TableMaster WHERE TableId = @tid;
 
+    -- 🚀 ROBUST LOOKUP: Prioritize the CurrentOrderId stored in TableMaster to avoid ghost orders
     SELECT TOP 1 @ActualOrderId = OrderId, @ActualOrderNo = OrderNumber
     FROM RestaurantOrderCur 
-    WHERE LTRIM(RTRIM(Tableno)) = @TableNo
-    AND (isOrderClosed = 0 OR isOrderClosed IS NULL)
-    ORDER BY CreatedOn DESC;
+    WHERE (OrderId = (SELECT TOP 1 OrderId FROM RestaurantOrderCur h2 WHERE h2.OrderNumber = (SELECT CurrentOrderId FROM TableMaster WHERE TableId = @tid) AND h2.isOrderClosed = 0))
+    OR (LTRIM(RTRIM(Tableno)) = @TableNo AND (isOrderClosed = 0 OR isOrderClosed IS NULL))
+    ORDER BY CASE WHEN OrderNumber = (SELECT CurrentOrderId FROM TableMaster WHERE TableId = @tid) THEN 0 ELSE 1 END, CreatedOn DESC;
 
     -- Calculate Totals strictly
     SELECT @count = COUNT(*), @total = ISNULL(SUM(ActualAmount), 0) 
