@@ -370,7 +370,7 @@ export const useCartStore = create<CartState>()(
             
             const newItem: CartItem = {
               ...normalizedIncoming,
-              lineItemId: `TEMP-${require("crypto").randomUUID()}`,
+              lineItemId: `TEMP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
               DateCreated: Math.max(now, latestTimestamp + 1)
             };
             finalLineItemId = newItem.lineItemId;
