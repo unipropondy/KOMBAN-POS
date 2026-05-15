@@ -504,7 +504,10 @@ initializeSocketListeners: () => {
         statusStr,
         data.StartTime,
         data.lockedByName,
-        data.TotalAmount
+        data.TotalAmount,
+        true, // isExternal
+        data.isHoldOvertime,
+        data.modifiedOn || data.ModifiedOn
       );
     });
 

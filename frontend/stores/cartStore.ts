@@ -954,7 +954,7 @@ export const useCartStore = create<CartState>()(
             }
             set({ pendingSync: false, _syncTimeout: null });
           }
-        }, isImmediate ? 0 : 5000);
+        }, isImmediate ? 0 : 1500); // 🚀 FASTER SYNC: Reduced from 5000ms for better responsiveness
         
         set({ _syncTimeout: timeout } as any);
       },
@@ -1080,7 +1080,7 @@ export const useCartStore = create<CartState>()(
           } catch (err) {
             console.error("❌ [CartStore] Fetch failed:", err);
           }
-        }, 300); // 300ms is enough to catch duplicate socket events
+        }, 100); // 🚀 FASTER FETCH: Reduced from 300ms
         
         set({ _fetchTimeout: timeout } as any);
       },
@@ -1096,34 +1096,58 @@ export const useCartStore = create<CartState>()(
 
       checkoutOrder: async (tableId) => {
         try {
+          console.log(`🚀 [CartStore] Initiating Checkout for Table: ${tableId}`);
           const response = await fetch(`${API_URL}/api/orders/checkout`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tableId }),
           });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ [CartStore] Checkout API Error (${response.status}):`, errorText);
+            return { success: false };
+          }
+
           const data = await response.json();
-          return { success: data.success, orderId: data.orderId };
+          console.log("✅ [CartStore] Checkout Success:", data);
+          return { success: true };
         } catch (err) {
           console.error("❌ [CartStore] Checkout failed:", err);
           return { success: false };
         }
       },
 
-      completeOrder: async (tableId: string) => {
+      completeOrder: async (tableId) => {
         try {
+          console.log(`🚀 [CartStore] Completing Order for Table: ${tableId}`);
           const response = await fetch(`${API_URL}/api/orders/complete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tableId }),
           });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ [CartStore] Complete API Error (${response.status}):`, errorText);
+            return { success: false };
+          }
+
           const data = await response.json();
+          console.log(`✅ [CartStore] Complete Success:`, data);
+
           if (data.success) {
-            // 🚀 FINAL CLEANUP: Clear local order ID and fetch fresh (empty) cart
+            // 🚀 INSTANT LOCAL RESET: Wipe everything related to this table immediately
+            get().clearTableSession(tableId);
+            
+            // Clean up the order ID mapping
             set((state) => {
               const updatedIds = { ...state.tableOrderIds };
               delete updatedIds[tableId];
               return { tableOrderIds: updatedIds };
             });
+
+            // Final fetch to ensure state matches DB
             await get().fetchCartFromDB(tableId);
             return { success: true };
           }

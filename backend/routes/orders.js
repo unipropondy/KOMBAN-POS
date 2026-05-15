@@ -825,7 +825,7 @@ router.post("/complete", async (req, res) => {
     
     // Final atomic update: Close the professional order and release the table
     await pool.request()
-      .input("tid", sql.UniqueIdentifier, cleanId)
+      .input("tid", sql.VarChar(50), cleanId)
       .query(`
         UPDATE RestaurantOrderCur SET isOrderClosed = 1, ModifiedOn = GETDATE() 
         WHERE LTRIM(RTRIM(Tableno)) = (SELECT TOP 1 LTRIM(RTRIM(TableNumber)) FROM TableMaster WHERE TableId = @tid) 

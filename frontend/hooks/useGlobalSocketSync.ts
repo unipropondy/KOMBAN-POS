@@ -4,6 +4,7 @@ import { useActiveOrdersStore } from "../stores/activeOrdersStore";
 import { useCartStore } from "../stores/cartStore";
 import { useOrderContextStore } from "../stores/orderContextStore";
 import { useTableStatusStore } from "../stores/tableStatusStore";
+import { API_URL } from "../constants/Config";
 
 /**
  * useGlobalSocketSync
@@ -16,11 +17,11 @@ export function useGlobalSocketSync() {
   const { fetchCartFromDB } = useCartStore.getState();
   const lastFetchRef = useRef<Record<string, number>>({});
 
-  // 🚀 THROTTLED FETCH: Prevents mass-refetching when multiple items update at once
-  const throttledFetch = (tableId: string) => {
+  // 🚀 HIGH-SPEED FETCH: Faster refresh for the active table
+  const throttledFetch = (tableId: string, delay = 500) => {
     const now = Date.now();
     const last = lastFetchRef.current[tableId] || 0;
-    if (now - last > 1000) {
+    if (now - last > delay) {
       lastFetchRef.current[tableId] = now;
       fetchCartFromDB(tableId);
     }
@@ -28,10 +29,13 @@ export function useGlobalSocketSync() {
 
   useEffect(() => {
     // --- 0. RECONNECTION RE-SYNC ---
-    const handleReconnect = () => {
-      console.log("🔌 [Socket-Global] Reconnected. Re-syncing active orders...");
+    const handleConnect = () => {
+      console.log(`🔌 [Socket-Global] CONNECTED: ${socket.id} | API: ${API_URL}`);
       useActiveOrdersStore.getState().fetchActiveKitchenOrders();
-      // Optionally refresh all tables if needed
+    };
+
+    const handleConnectError = (error: any) => {
+      console.error("🔌 [Socket-Global] CONNECTION ERROR:", error);
     };
 
     // --- 1. NEW ORDERS ---
@@ -87,11 +91,21 @@ export function useGlobalSocketSync() {
         );
       }
 
-      // ⚡ If this is our current table, refresh the cart
+      // ⚡ Only refresh cart if the Order ID has changed or if we're missing items
       const currentOrder = useOrderContextStore.getState().currentOrder;
+      const currentCartItems = useCartStore.getState().carts[useCartStore.getState().currentContextId || ""] || [];
+      
       if (currentOrder?.tableId === tableId) {
-        console.log(`[TRACE] [${Date.now()}] [SOCKET_RECEIVE] Table ${tableId} is ACTIVE. Refreshing cart...`);
-        throttledFetch(tableId);
+        const orderIdChanged = currentOrderId && currentOrderId !== "SYNC" && currentOrderId !== currentOrder.orderId;
+        const isCartEmpty = currentCartItems.length === 0 && totalAmount > 0;
+        
+        if (orderIdChanged || isCartEmpty) {
+          console.log(`[TRACE] [${Date.now()}] [SOCKET_RECEIVE] Definitive Change. Refreshing cart...`);
+          throttledFetch(tableId, 100); // Fast refresh for critical changes
+        } else {
+          // Skip redundant fetch - rely on cart_change relay for item-level updates
+          console.log(`[TRACE] [${Date.now()}] [SOCKET_RECEIVE] Table ${tableId} total updated. Skipping redundant fetch.`);
+        }
       }
     };
 
@@ -119,10 +133,11 @@ export function useGlobalSocketSync() {
 
     // --- 4. CART UPDATED ---
     const handleCartUpdated = (data: { tableId: string }) => {
-      console.log("🛒 [Socket-Global] Cart updated for Table:", data.tableId);
+      console.log("🛒 [Socket-Global] Cart updated (DB Sync) for Table:", data.tableId);
       const currentOrder = useOrderContextStore.getState().currentOrder;
       if (data.tableId && data.tableId === currentOrder?.tableId) {
-        throttledFetch(data.tableId);
+        // Lower priority than cart_change relay
+        throttledFetch(data.tableId, 2000); 
       }
       useActiveOrdersStore.getState().fetchActiveKitchenOrders();
     };
@@ -155,7 +170,8 @@ export function useGlobalSocketSync() {
       store.setCartItems(payload.contextId, payload.items, true, "SOCKET_CHANGE");
     };
 
-    socket.on("connect", handleReconnect);
+    socket.on("connect", handleConnect);
+    socket.on("connect_error", handleConnectError);
     socket.on("new_order", handleNewOrder);
     socket.on("table_status_updated", handleTableStatus);
     socket.on("item_status_updated", handleItemStatus);
@@ -164,7 +180,7 @@ export function useGlobalSocketSync() {
     socket.on("cart_change", handleCartChange);
 
     return () => {
-      socket.off("connect", handleReconnect);
+      socket.off("connect", handleConnect);
       socket.off("new_order", handleNewOrder);
       socket.off("table_status_updated", handleTableStatus);
       socket.off("item_status_updated", handleItemStatus);
