@@ -1052,16 +1052,33 @@ export const useCartStore = create<CartState>()(
                return true;
             });
 
-            const mergedItems = [...filteredDbItems];
+            // 🚀 SMART MERGE: Favor local "Draft" edits (Note, TW, Qty) over stale server data
+            const mergedItems = filteredDbItems.map((dbItem: CartItem) => {
+              const localMatch = localPendingItems.find(li => li.lineItemId === dbItem.lineItemId);
+              
+              // If we have a local version of this item and it's a DRAFT (Status NEW)
+              // we prioritize local edits because the server response might be stale (sync in progress)
+              if (localMatch && (localMatch.status === 'NEW' || !localMatch.status)) {
+                return {
+                  ...dbItem,
+                  qty: localMatch.qty,
+                  note: localMatch.note || dbItem.note,
+                  isTakeaway: localMatch.isTakeaway,
+                  discount: localMatch.discount,
+                  modifiers: localMatch.modifiers
+                };
+              }
+              return dbItem;
+            });
+
+            // Add any purely local items that don't exist on server at all (NEWly added)
             localPendingItems.forEach(localItem => {
-              const existsInFilteredDb = filteredDbItems.some((dbItem: CartItem) => 
+              const existsOnServer = filteredDbItems.some((dbItem: CartItem) => 
                 dbItem.lineItemId === localItem.lineItemId || 
                 (dbItem.id === localItem.id && getModifierKey(dbItem.modifiers) === getModifierKey(localItem.modifiers))
               );
               
-              // Only add local item if it doesn't exist in filtered DB result
-              if (!existsInFilteredDb) {
-                // Double check it's not in the shield either
+              if (!existsOnServer) {
                 const shieldExpiry = deletedItemsShield[localItem.lineItemId];
                 if (!shieldExpiry || now >= shieldExpiry) {
                    mergedItems.push(localItem);
