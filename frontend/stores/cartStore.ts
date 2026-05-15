@@ -179,6 +179,7 @@ type CartState = {
   operationVersion: Record<string, number>; // 🛡️ VERSION SHIELD: Per-context operation counter
   isClearing: Record<string, boolean>; // 🛡️ CLEAR LOCK: Block fetches during clear
   deletingItems: Set<string>; // 🛡️ DELETE LOCK: Block interactions for specific lineItemIds
+  cartQtyMap: Record<string, Record<string, number>>; // 🚀 PERFORMANCE: contextId -> dishId -> totalQty
 
   setCurrentContext: (contextId: string | null) => void;
 
@@ -249,6 +250,7 @@ export const useCartStore = create<CartState>()(
       operationVersion: {},
       isClearing: {},
       deletingItems: new Set(),
+      cartQtyMap: {},
       _syncAbortControllers: {},
 
       setCurrentContext: (contextId) => set({ currentContextId: contextId }),
@@ -268,8 +270,15 @@ export const useCartStore = create<CartState>()(
         console.log(`[TRACE] [${Date.now()}] [SOCKET_QUANTITY_SYNC] Received ${items.length} items for Context: ${currentContextId}`);
         items.forEach((item: CartItem) => console.log(`[TRACE] [SOCKET_QUANTITY_SYNC] Item: ${item.name} | Qty: ${item.qty}`));
 
+        // Update qty map
+        const newQtyMap: Record<string, number> = {};
+        items.forEach(item => {
+          newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+        });
+
         set((state) => ({
           carts: { ...state.carts, [currentContextId]: items },
+          cartQtyMap: { ...state.cartQtyMap, [currentContextId]: newQtyMap },
           lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
         }));
       },
@@ -380,13 +389,22 @@ export const useCartStore = create<CartState>()(
             updatedCart = [...currentCart, newItem];
           }
 
-          set((state) => ({ 
-            carts: { 
-              ...state.carts, 
-              [currentContextId]: updatedCart 
-            }, 
-            lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() } 
-          }));
+          set((state) => {
+            const newQtyMap = { ...(state.cartQtyMap[currentContextId] || {}) };
+            newQtyMap[normalizedIncoming.id] = (newQtyMap[normalizedIncoming.id] || 0) + 1;
+
+            return { 
+              carts: { 
+                ...state.carts, 
+                [currentContextId]: updatedCart 
+              }, 
+              cartQtyMap: {
+                ...state.cartQtyMap,
+                [currentContextId]: newQtyMap
+              },
+              lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() } 
+            };
+          });
 
           // 🚀 INSTANT SYNC: Tell other tablets immediately (Socket-First)
           socket.emit("cart_change", { 
@@ -424,13 +442,21 @@ export const useCartStore = create<CartState>()(
           status: "SENT" as const
         }));
 
-        set((state) => ({ 
-          carts: { 
-            ...state.carts, 
-            [currentContextId]: updatedCart 
-          }, 
-          lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() } 
-        }));
+        set((state) => {
+          const newQtyMap: Record<string, number> = {};
+          updatedCart.forEach(item => {
+            newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+          });
+
+          return { 
+            carts: { 
+              ...state.carts, 
+              [currentContextId]: updatedCart 
+            }, 
+            cartQtyMap: { ...state.cartQtyMap, [currentContextId]: newQtyMap },
+            lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() } 
+          };
+        });
         
         // 🚀 IMMEDIATE SYNC: Don't wait for debounce when sending to kitchen
         const tableId = useOrderContextStore.getState().currentOrder?.tableId;
@@ -443,13 +469,22 @@ export const useCartStore = create<CartState>()(
         const { currentContextId, carts } = get();
         if (!currentContextId || !carts[currentContextId]) return;
 
-        set((state) => ({
-          carts: {
-            ...state.carts,
-            [currentContextId]: mergeCartItems(state.carts[currentContextId])
-          },
-          lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
-        }));
+        set((state) => {
+          const updatedItems = mergeCartItems(state.carts[currentContextId]);
+          const newQtyMap: Record<string, number> = {};
+          updatedItems.forEach(item => {
+            newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+          });
+
+          return {
+            carts: {
+              ...state.carts,
+              [currentContextId]: updatedItems
+            },
+            cartQtyMap: { ...state.cartQtyMap, [currentContextId]: newQtyMap },
+            lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
+          };
+        });
 
         get().syncCartWithDB(currentContextId);
       },
@@ -488,7 +523,16 @@ export const useCartStore = create<CartState>()(
         const previousCart = get().carts[currentContextId] || [];
         set((state) => {
           const updatedCart = previousCart.filter(p => p.lineItemId !== lineItemId);
-          return { carts: { ...state.carts, [currentContextId]: updatedCart } };
+          
+          const newQtyMap: Record<string, number> = {};
+          updatedCart.forEach(item => {
+            newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+          });
+
+          return { 
+            carts: { ...state.carts, [currentContextId]: updatedCart },
+            cartQtyMap: { ...state.cartQtyMap, [currentContextId]: newQtyMap }
+          };
         });
 
         try {
@@ -573,10 +617,18 @@ export const useCartStore = create<CartState>()(
         });
 
         // 🚀 IMMEDIATE UPDATE
-        set((state) => ({ 
-          carts: { ...state.carts, [currentContextId]: sentItems }, 
-          deletedItemsShield: newShield,
-        }));
+        set((state) => {
+          const newQtyMap: Record<string, number> = {};
+          sentItems.forEach(item => {
+            newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+          });
+
+          return { 
+            carts: { ...state.carts, [currentContextId]: sentItems }, 
+            cartQtyMap: { ...state.cartQtyMap, [currentContextId]: newQtyMap },
+            deletedItemsShield: newShield,
+          };
+        });
 
         try {
           socket.emit("cart_change", { 
@@ -667,10 +719,19 @@ export const useCartStore = create<CartState>()(
           return true;
         });
 
-        set((state) => ({
-          carts: { ...state.carts, [contextId]: mergeCartItems(filteredItems.map((item) => normalizeCartItem(item))) },
-          lastLocalUpdate: { ...state.lastLocalUpdate, [contextId]: Date.now() }
-        }));
+        set((state) => {
+          const updatedItems = mergeCartItems(filteredItems.map((item) => normalizeCartItem(item)));
+          const newQtyMap: Record<string, number> = {};
+          updatedItems.forEach(item => {
+            newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+          });
+
+          return {
+            carts: { ...state.carts, [contextId]: updatedItems },
+            cartQtyMap: { ...state.cartQtyMap, [contextId]: newQtyMap },
+            lastLocalUpdate: { ...state.lastLocalUpdate, [contextId]: Date.now() }
+          };
+        });
 
         if (!skipSync) {
           get().syncCartWithDB(contextId);
@@ -688,16 +749,26 @@ export const useCartStore = create<CartState>()(
           console.log(`[TRACE] [${Date.now()}] [QUANTITY_${type}] Product: ${item.name} | NewQty: ${newQty}`);
         }
 
-        set((state) => ({
-          carts: { 
-            ...state.carts, 
-            [currentContextId]: updateCartItemInArray(state.carts[currentContextId] || [], lineItemId, {
-              qty: Math.max(0, newQty),
-              discount: discount !== undefined ? discount : undefined
-            }).filter(i => i.qty > 0)
-          },
-          lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
-        }));
+        set((state) => {
+          const updatedCart = updateCartItemInArray(state.carts[currentContextId] || [], lineItemId, {
+            qty: Math.max(0, newQty),
+            discount: discount !== undefined ? discount : undefined
+          }).filter(i => i.qty > 0);
+
+          const newQtyMap: Record<string, number> = {};
+          updatedCart.forEach(item => {
+            newQtyMap[item.id] = (newQtyMap[item.id] || 0) + item.qty;
+          });
+
+          return {
+            carts: { 
+              ...state.carts, 
+              [currentContextId]: updatedCart
+            },
+            cartQtyMap: { ...state.cartQtyMap, [currentContextId]: newQtyMap },
+            lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
+          };
+        });
         get().syncCartWithDB(currentContextId);
       },
 

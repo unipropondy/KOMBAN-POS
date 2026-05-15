@@ -802,7 +802,7 @@ interface CartSidebarProps {
   width?: DimensionValue;
 }
 
-export default function CartSidebar({ width = 400 }: CartSidebarProps) {
+export default React.memo(function CartSidebar({ width = 400 }: CartSidebarProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const { user } = useAuthStore();
@@ -1748,6 +1748,6 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
       />
     </View>
   );
-}
+});
 
 

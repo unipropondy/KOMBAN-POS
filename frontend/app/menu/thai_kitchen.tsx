@@ -227,17 +227,9 @@ const DishCardWrapper = React.memo(({ item, width, isPhone, isTablet, isLandscap
   // ⚡ SURGICAL SUBSCRIPTION: Only re-render if the quantity of THIS specific product changes
   const cartQty = useCartStore(state => {
     if (!currentContextId) return 0;
-    const cart = state.carts[currentContextId] || [];
-    let total = 0;
-    for (let i = 0; i < cart.length; i++) {
-      if (cart[i].id === dishId) total += cart[i].qty;
-    }
-    
-    if (total > 0) {
-      console.log(`[TRACE] [${Date.now()}] [MENU_BADGE_UPDATE] Product: ${item.Name || item.name} | Qty: ${total}`);
-    }
-    return total;
-  }, (prev, next) => prev === next);
+    const qtyMap = state.cartQtyMap[currentContextId] || {};
+    return qtyMap[dishId] || 0;
+  });
 
   return (
     <DishCard
@@ -305,6 +297,35 @@ const GroupSkeleton = () => (
   </View>
 );
 
+// 🚀 PERFORMANCE OPTIMIZATION: Cart Badge Component
+const CartBadge = React.memo(({ isPhone, isLandscape }: any) => {
+  const currentContextId = useCartStore(state => state.currentContextId);
+  const count = useCartStore(state => {
+    if (!currentContextId) return 0;
+    return (state.carts[currentContextId] || []).length;
+  });
+
+  if (count === 0) return null;
+
+  return (
+    <View
+      style={[
+        styles.cartBadge,
+        isPhone && isLandscape && { top: -4, right: -4, minWidth: 16, height: 16 },
+      ]}
+    >
+      <Text
+        style={[
+          styles.cartBadgeText,
+          isPhone && isLandscape && { fontSize: 9 },
+        ]}
+      >
+        {count}
+      </Text>
+    </View>
+  );
+});
+
 // --- SCREEN ---
 
 export default function MenuScreen() {
@@ -346,32 +367,14 @@ export default function MenuScreen() {
 
   const orderContext = useOrderContextStore((state) => state.currentOrder);
   
-  // 🟢 OPTIMIZED SELECTORS: Only re-render when SPECIFIC data changes
+  // 🟢 OPTIMIZED SELECTORS: Removed cart subscription from main screen to prevent full-screen re-renders.
   const currentContextId = useCartStore((state) => state.currentContextId);
-  const cart = useCartStore((state) => (currentContextId ? state.carts[currentContextId] : undefined) || EMPTY_ARRAY);
-  const discountInfo = useCartStore((state) => (currentContextId ? state.discounts[currentContextId] : undefined) || { applied: false, type: "fixed" as const, value: 0 });
   const displayOrderId = useCartStore((state) => (orderContext?.tableId ? state.tableOrderIds[orderContext.tableId] : undefined) || null);
-
-  const activeOrders = useActiveOrdersStore((state) => state.activeOrders);
 
   // 🟢 QUANTITY TRACKING: Handled surgically within DishCardWrapper to avoid O(N^2) re-renders
 
-  const activeOrder = useMemo(() => {
-    if (!orderContext) return undefined;
-    return activeOrders.find((o) => {
-      if (orderContext.orderType === "DINE_IN") {
-        return (
-          o.context.orderType === "DINE_IN" &&
-          o.context.section === orderContext.section &&
-          o.context.tableNo === orderContext.tableNo
-        );
-      }
-      return (
-        o.context.orderType === "TAKEAWAY" &&
-        o.context.takeawayNo === orderContext.takeawayNo
-      );
-    });
-  }, [activeOrders, orderContext]);
+  // Removed activeOrder memo to avoid system-wide re-renders.
+  // Access on-demand in handlers instead.
 
   const isLandscape = width > height;
   const isTablet = Math.min(width, height) >= 500;
@@ -380,38 +383,23 @@ export default function MenuScreen() {
 
   const isFetchingCart = React.useRef(false);
 
-  const cartItemsCount = useMemo(() => {
-    return cart.length;
-  }, [cart]);
+  // Removed cartItemsCount dependency
 
   const insets = useSafeAreaInsets();
   const usableWidth = width - insets.left - insets.right;
 
-  const subtotal = useMemo(() => {
-    return cart.reduce((sum: number, item: any) => {
-      if (item.status === "VOIDED") return sum;
-      return sum + (item.price || 0) * item.qty;
-    }, 0);
-  }, [cart]);
-
-  const discountAmount = useMemo(() => {
-    if (!discountInfo?.applied) return 0;
-    if (discountInfo.type === "percentage")
-      return (subtotal * discountInfo.value) / 100;
-    return discountInfo.value;
-  }, [discountInfo, subtotal]);
-
-  const gstRate = (paymentSettings.gstPercentage || 0) / 100;
-  const gstAmount = subtotal * gstRate;
-  const grandTotal = subtotal - discountAmount + gstAmount;
+  // Moved totals to handlers or CartSidebar. 
+  // MenuScreen no longer needs to calculate these on every render.
 
   const handleReprintKOT = async () => {
+    const cart = useCartStore.getState().carts[currentContextId!] || [];
     if (!cart.length) {
       showToast({ type: "error", message: "Cart is empty" });
       return;
     }
 
     try {
+      const cart = useCartStore.getState().carts[currentContextId!] || [];
       const kitchenGroups: Record<string, any[]> = {};
       cart
         .filter((i: any) => i.status !== "VOIDED")
@@ -445,14 +433,30 @@ export default function MenuScreen() {
   };
 
   const handleReprintBill = async () => {
+    const cart = useCartStore.getState().carts[currentContextId!] || [];
     if (!cart.length) {
       showToast({ type: "error", message: "Cart is empty" });
       return;
     }
     try {
+      const cart = useCartStore.getState().carts[currentContextId!] || [];
+      const discountInfo = useCartStore.getState().discounts[currentContextId!] || { applied: false, type: "fixed", value: 0 };
+      
+      const subtotal = cart.reduce((sum: number, item: any) => {
+        if (item.status === "VOIDED") return sum;
+        return sum + (item.price || 0) * item.qty;
+      }, 0);
+
+      const discAmt = discountInfo.applied 
+        ? (discountInfo.type === "percentage" ? (subtotal * discountInfo.value) / 100 : discountInfo.value)
+        : 0;
+
+      const gstAmt = subtotal * ((paymentSettings.gstPercentage || 0) / 100);
+      const total = subtotal - discAmt + gstAmt;
+
       const saleData = {
         items: cart,
-        total: grandTotal,
+        total: total,
         subtotal: subtotal,
         discount: discountInfo,
         orderId: displayOrderId,
@@ -464,7 +468,7 @@ export default function MenuScreen() {
 
       await UniversalPrinter.printCheckoutBill(saleData, user?.userId || "SYSTEM", {
         ...discountInfo,
-        amount: discountAmount
+        amount: discAmt
       });
 
       showToast({ type: "success", message: "Bill Printing", subtitle: "Receipt sent to printer" });
@@ -578,24 +582,7 @@ export default function MenuScreen() {
             size={isPhone && isLandscape ? 20 : 24}
             color={Theme.primary}
           />
-          {cartItemsCount > 0 && (
-            <View
-              style={[
-                styles.cartBadge,
-                isPhone &&
-                  isLandscape && { top: -4, right: -4, minWidth: 16, height: 16 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.cartBadgeText,
-                  isPhone && isLandscape && { fontSize: 9 },
-                ]}
-              >
-                {cartItemsCount}
-              </Text>
-            </View>
-          )}
+          <CartBadge isPhone={isPhone} isLandscape={isLandscape} />
         </TouchableOpacity>
 
         <View style={styles.topActions}>
