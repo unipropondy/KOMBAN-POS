@@ -370,8 +370,10 @@ export const useCartStore = create<CartState>()(
             
             const newItem: CartItem = {
               ...normalizedIncoming,
+              lineItemId: `TEMP-${require("crypto").randomUUID()}`,
               DateCreated: Math.max(now, latestTimestamp + 1)
             };
+            finalLineItemId = newItem.lineItemId;
             updatedCart = [...currentCart, newItem];
           }
 
@@ -1058,9 +1060,8 @@ export const useCartStore = create<CartState>()(
               
               // 🛡️ SYNC SHIELD: If we have a local version that was modified recently,
               // we MUST preserve the local Qty/Note/TW even for SENT items.
-              // This prevents background fetches from "reverting" a change while it's being synced.
               const timeSinceLastEdit = now - (state.lastLocalUpdate[resolvedContextId!] || 0);
-              const isRecentlyEdited = timeSinceLastEdit < 3000; // 3s safety window
+              const isRecentlyEdited = timeSinceLastEdit < 5000; // 🛡️ Increased to 5s for slower networks
 
               if (localMatch && (localMatch.status === 'NEW' || !localMatch.status || isRecentlyEdited)) {
                 // Determine the most "advanced" status (SENT is more advanced than NEW)
@@ -1069,9 +1070,9 @@ export const useCartStore = create<CartState>()(
                 return {
                   ...dbItem,
                   qty: localMatch.qty,
-                  note: localMatch.note || dbItem.note,
-                  isTakeaway: localMatch.isTakeaway,
-                  discount: localMatch.discount,
+                  note: localMatch.note ?? dbItem.note, // Use ?? to allow empty string notes
+                  isTakeaway: localMatch.isTakeaway ?? dbItem.isTakeaway,
+                  discount: localMatch.discount ?? dbItem.discount,
                   modifiers: localMatch.modifiers,
                   status: isSent ? 'SENT' : (localMatch.status || dbItem.status),
                   sent: isSent ? 1 : 0
