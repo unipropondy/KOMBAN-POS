@@ -1052,20 +1052,26 @@ export const useCartStore = create<CartState>()(
                return true;
             });
 
-            // 🚀 SMART MERGE: Favor local "Draft" edits (Note, TW, Qty) over stale server data
+            // 🚀 SMART MERGE: Favor local edits (Note, TW, Qty) over stale server data
             const mergedItems = filteredDbItems.map((dbItem: CartItem) => {
               const localMatch = localPendingItems.find(li => li.lineItemId === dbItem.lineItemId);
               
-              // If we have a local version of this item and it's a DRAFT (Status NEW)
-              // we prioritize local edits because the server response might be stale (sync in progress)
-              if (localMatch && (localMatch.status === 'NEW' || !localMatch.status)) {
+              // 🛡️ SYNC SHIELD: If we have a local version that was modified recently,
+              // we MUST preserve the local Qty/Note/TW even for SENT items.
+              // This prevents background fetches from "reverting" a change while it's being synced.
+              const timeSinceLastEdit = now - (state.lastLocalUpdate[resolvedContextId!] || 0);
+              const isRecentlyEdited = timeSinceLastEdit < 3000; // 3s safety window
+
+              if (localMatch && (localMatch.status === 'NEW' || !localMatch.status || isRecentlyEdited)) {
+                // If local quantity is different, it means the user just changed it
                 return {
                   ...dbItem,
                   qty: localMatch.qty,
                   note: localMatch.note || dbItem.note,
                   isTakeaway: localMatch.isTakeaway,
                   discount: localMatch.discount,
-                  modifiers: localMatch.modifiers
+                  modifiers: localMatch.modifiers,
+                  status: localMatch.status || dbItem.status // Preserve local status if it's more specific
                 };
               }
               return dbItem;

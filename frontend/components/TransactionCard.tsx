@@ -29,8 +29,8 @@ const TransactionCard = React.memo(
           styles.transactionCard,
           (item.VoidAmount > 0 || item.IsCancelled) && {
             borderColor: Theme.danger,
-            borderWidth: 1.5,
-            backgroundColor: Theme.danger + "05",
+            borderWidth: 1.2,
+            backgroundColor: Theme.danger + "08",
           },
         ]}
       >
@@ -57,20 +57,9 @@ const TransactionCard = React.memo(
           <Text style={styles.txDatetime}>
             {settlementDate.toLocaleDateString([], { day: 'numeric', month: 'short' })} • {settlementDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
-          {item.IsCancelled && item.CancellationReason && (
-             <Text style={styles.cancelledReason} numberOfLines={1}>
-               {item.CancellationReason}
-             </Text>
-          )}
         </View>
         <View style={styles.paidIndicator}>
-           {item.IsCancelled ? (
-             <View style={styles.cancelledBadge}>
-               <Text style={styles.cancelledBadgeText}>CANCELLED</Text>
-             </View>
-           ) : (
-             <Ionicons name="checkmark-circle" size={16} color={Theme.success} />
-           )}
+           <Ionicons name="checkmark-circle" size={16} color={Theme.success} />
         </View>
       </TouchableOpacity>
     );
