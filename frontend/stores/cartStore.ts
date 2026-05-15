@@ -1063,7 +1063,9 @@ export const useCartStore = create<CartState>()(
               const isRecentlyEdited = timeSinceLastEdit < 3000; // 3s safety window
 
               if (localMatch && (localMatch.status === 'NEW' || !localMatch.status || isRecentlyEdited)) {
-                // If local quantity is different, it means the user just changed it
+                // Determine the most "advanced" status (SENT is more advanced than NEW)
+                const isSent = localMatch.status === 'SENT' || dbItem.status === 'SENT' || !!localMatch.sent;
+                
                 return {
                   ...dbItem,
                   qty: localMatch.qty,
@@ -1071,7 +1073,8 @@ export const useCartStore = create<CartState>()(
                   isTakeaway: localMatch.isTakeaway,
                   discount: localMatch.discount,
                   modifiers: localMatch.modifiers,
-                  status: localMatch.status || dbItem.status // Preserve local status if it's more specific
+                  status: isSent ? 'SENT' : (localMatch.status || dbItem.status),
+                  sent: isSent ? 1 : 0
                 };
               }
               return dbItem;
