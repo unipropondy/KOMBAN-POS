@@ -510,7 +510,7 @@ const CartItemRow = React.memo(
                 color={Theme.textMuted}
                 style={styles.chevron}
               />
-              <Text style={styles.itemIndex}>{index + 1}</Text>
+              <Text style={styles.itemIndex}>{index + 1}.</Text>
             </View>
           )}
 
@@ -787,6 +787,7 @@ const CartItemRow = React.memo(
   },
   (prev, next) => {
     return (
+      prev.index === next.index &&
       prev.item.lineItemId === next.item.lineItemId &&
       prev.item.qty === next.item.qty &&
       prev.item.status === next.item.status &&
