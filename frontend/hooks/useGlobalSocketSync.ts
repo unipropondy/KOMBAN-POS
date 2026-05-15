@@ -95,8 +95,9 @@ export function useGlobalSocketSync() {
       const currentOrder = useOrderContextStore.getState().currentOrder;
       const currentCartItems = useCartStore.getState().carts[useCartStore.getState().currentContextId || ""] || [];
       
-      if (currentOrder?.tableId === tableId) {
-        const orderIdChanged = currentOrderId && currentOrderId !== "SYNC" && currentOrderId !== currentOrder.orderId;
+      if (currentOrder && currentOrder.tableId === tableId) {
+        const existingOrderId = useCartStore.getState().tableOrderIds[tableId];
+        const orderIdChanged = !!currentOrderId && currentOrderId !== "SYNC" && currentOrderId !== existingOrderId;
         const isCartEmpty = currentCartItems.length === 0 && totalAmount > 0;
         
         if (orderIdChanged || isCartEmpty) {
