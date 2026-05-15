@@ -860,6 +860,16 @@ export const useCartStore = create<CartState>()(
           };
         });
         
+        const tableId = useOrderContextStore.getState().currentOrder?.tableId;
+        if (tableId) {
+          socket.emit("cart_change", { 
+            tableId, 
+            contextId: currentContextId, 
+            items: get().carts[currentContextId], 
+            lastUpdate: Date.now() 
+          });
+        }
+
         get().syncCartWithDB(currentContextId);
       },
 

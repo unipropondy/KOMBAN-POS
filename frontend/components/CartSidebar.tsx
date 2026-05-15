@@ -788,13 +788,17 @@ const CartItemRow = React.memo(
   (prev, next) => {
     return (
       prev.index === next.index &&
+      prev.isDeleting === next.isDeleting &&
+      prev.tableStatus === next.tableStatus &&
+      prev.isPhone === next.isPhone &&
+      prev.isLandscape === next.isLandscape &&
       prev.item.lineItemId === next.item.lineItemId &&
       prev.item.qty === next.item.qty &&
       prev.item.status === next.item.status &&
       prev.item.isTakeaway === next.item.isTakeaway &&
-      prev.tableStatus === next.tableStatus &&
-      prev.isPhone === next.isPhone &&
-      prev.isLandscape === next.isLandscape
+      prev.item.note === next.item.note &&
+      prev.item.discount === next.item.discount &&
+      JSON.stringify(prev.item.modifiers) === JSON.stringify(next.item.modifiers)
     );
   },
 );
