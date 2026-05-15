@@ -10,6 +10,7 @@ import {
   Image,
   Keyboard,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -99,42 +100,20 @@ const NavRail = () => {
 
 const DishCard = React.memo(
   ({ dish, width, cartQty, onPress, isPhone, isTablet, isLandscape }: any) => {
-    const scaleAnim = React.useRef(new Animated.Value(1)).current;
-
-    React.useEffect(() => {
-      if (cartQty > 0) {
-        // Pop animation
-        Animated.sequence([
-          Animated.spring(scaleAnim, {
-            toValue: 1.2,
-            useNativeDriver: true,
-            speed: 50,
-            bounciness: 10,
-          }),
-          Animated.spring(scaleAnim, {
-            toValue: 1,
-            useNativeDriver: true,
-            speed: 50,
-          }),
-        ]).start();
-      }
-    }, [cartQty]);
-
     return (
-      <TouchableOpacity
-        style={[
+      <Pressable
+        style={({ pressed }: { pressed: boolean }) => [
           styles.card,
           { width, padding: isPhone ? 8 : isTablet ? 12 : 10 },
           isLandscape && !isTablet && { maxHeight: 135 },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }
         ]}
         onPress={() => onPress(dish)}
-        activeOpacity={0.7}
       >
         {cartQty > 0 && (
-          <Animated.View
+          <View
             style={[
               styles.qtyBadge,
-              { transform: [{ scale: scaleAnim }] },
               isPhone
                 ? { width: 22, height: 22, borderRadius: 11 }
                 : isTablet
@@ -150,7 +129,7 @@ const DishCard = React.memo(
             >
               {cartQty}
             </Text>
-          </Animated.View>
+          </View>
         )}
         <View
           style={[
@@ -213,7 +192,7 @@ const DishCard = React.memo(
         >
           ${(dish.Price || 0).toFixed(2)}
         </Text>
-      </TouchableOpacity>
+      </Pressable>
     );
   },
 );
@@ -746,7 +725,6 @@ export default function MenuScreen() {
       const currentKitchenCode = currentKitchen?.KitchenTypeCode || String(selectedKitchenId || "0");
       
       const addToCartSimple = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         addToCartGlobal({
           id: dish.DishId,
           name: dish.Name,

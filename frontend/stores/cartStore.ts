@@ -335,19 +335,13 @@ export const useCartStore = create<CartState>()(
 
         const newVersion = (get().operationVersion[currentContextId!] || 0) + 1;
         const now = Date.now();
-        console.log(`[TRACE] [${now}] [${currentContextId}] Mutate: ADD_ITEM | Product: ${item.name} | Version: ${newVersion}`);
-
-        // 🚀 OPTIMISTIC UPDATE: Update local state immediately
+        // 🚀 OPTIMISTIC UPDATE: Update local state immediately (Merged into one set call)
         if (currentContextId) {
-          set(state => ({
-            operationVersion: { ...state.operationVersion, [currentContextId]: newVersion },
-            lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: now }
-          }));
-          
           const currentCart = carts[currentContextId] || [];
-          
+          let updatedCart: CartItem[];
+          let finalLineItemId = targetLineItemId;
+
           const existingIndex = currentCart.findIndex(p => {
-            // Speed-optimized check for high-traffic POS
             if (p.id !== normalizedIncoming.id || 
                 p.status !== "NEW" || 
                 p.isTakeaway !== normalizedIncoming.isTakeaway || 
@@ -360,9 +354,6 @@ export const useCartStore = create<CartState>()(
             return getModifierKey(p.modifiers) === newItemModKey;
           });
 
-          let updatedCart: CartItem[];
-          let finalLineItemId = targetLineItemId;
-
           if (existingIndex > -1) {
             updatedCart = [...currentCart];
             const newQty = (updatedCart[existingIndex].qty || 0) + 1;
@@ -370,18 +361,13 @@ export const useCartStore = create<CartState>()(
               ...updatedCart[existingIndex], 
               qty: newQty 
             };
-            console.log(`[TRACE] [${Date.now()}] [QUANTITY_INCREMENT] Product: ${updatedCart[existingIndex].name} | NewQty: ${newQty}`);
             finalLineItemId = updatedCart[existingIndex].lineItemId;
           } else {
-            console.log(`[TRACE] [${Date.now()}] [ITEM_ADD] Product: ${normalizedIncoming.name} | Context: ${currentContextId}`);
-            // ✅ Safe-Chrono Sequencing: Ensure new item is always newer than existing items
-            // even if there is clock skew between client and server.
             const latestTimestamp = currentCart.reduce((max, i) => {
               const t = i.DateCreated ? new Date(i.DateCreated).getTime() : 0;
               return t > max ? t : max;
             }, 0);
             
-            // 🚀 FAST TIMESTAMP: Use number instead of complex ISO string for hot-path additions
             const newItem: CartItem = {
               ...normalizedIncoming,
               DateCreated: Math.max(now, latestTimestamp + 1)
@@ -394,6 +380,7 @@ export const useCartStore = create<CartState>()(
             newQtyMap[normalizedIncoming.id] = (newQtyMap[normalizedIncoming.id] || 0) + 1;
 
             return { 
+              operationVersion: { ...state.operationVersion, [currentContextId]: newVersion },
               carts: { 
                 ...state.carts, 
                 [currentContextId]: updatedCart 
@@ -402,7 +389,7 @@ export const useCartStore = create<CartState>()(
                 ...state.cartQtyMap,
                 [currentContextId]: newQtyMap
               },
-              lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() } 
+              lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: now } 
             };
           });
 
@@ -848,13 +835,30 @@ export const useCartStore = create<CartState>()(
         const { currentContextId } = get();
         if (!currentContextId) return;
 
-        set((state) => ({
-          carts: { 
-            ...state.carts, 
-            [currentContextId]: updateCartItemInArray(state.carts[currentContextId] || [], lineItemId, updates)
-          },
-          lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
-        }));
+        set((state) => {
+          const updatedCart = updateCartItemInArray(state.carts[currentContextId] || [], lineItemId, updates);
+          
+          // 🚀 SURGICAL: Recompute only if qty changed
+          const newQtyMap = { ...(state.cartQtyMap[currentContextId] || {}) };
+          if (updates.qty !== undefined) {
+             // Reset qty map for this context and recompute
+             // (More robust than partial updates for nested items)
+             const tempMap: Record<string, number> = {};
+             updatedCart.forEach(i => {
+                tempMap[i.id] = (tempMap[i.id] || 0) + (i.qty || 0);
+             });
+             return {
+                carts: { ...state.carts, [currentContextId]: updatedCart },
+                cartQtyMap: { ...state.cartQtyMap, [currentContextId]: tempMap },
+                lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
+             };
+          }
+
+          return {
+            carts: { ...state.carts, [currentContextId]: updatedCart },
+            lastLocalUpdate: { ...state.lastLocalUpdate, [currentContextId]: Date.now() }
+          };
+        });
         
         get().syncCartWithDB(currentContextId);
       },
