@@ -1962,28 +1962,19 @@ export default function SalesReport() {
                   </TouchableOpacity>
                 </View>
 
-                {/* 🚨 CANCELLED BANNER */}
+                {/* 🚨 CANCELLED BANNER - Compact Version */}
                 {selectedOrder?.IsCancelled ? (
-                  <View style={styles.cancelledOrderBanner}>
-                    <View style={styles.cancelledBannerHeader}>
-                      <Ionicons name="alert-circle" size={18} color="#fff" />
-                      <Text style={styles.cancelledBannerTitle}>ORDER CANCELLED</Text>
+                  <View style={styles.cancelledOrderBadge}>
+                    <View style={styles.cancelledBadgeMain}>
+                      <Ionicons name="alert-circle" size={16} color={Theme.danger} />
+                      <Text style={styles.cancelledBadgeText}>ORDER CANCELLED</Text>
+                      <View style={styles.cancelledReasonBadge}>
+                        <Text style={styles.cancelledReasonText}>{selectedOrder.CancellationReason || "No reason"}</Text>
+                      </View>
                     </View>
-                    <View style={styles.cancelledBannerContent}>
-                      <View style={styles.cancelledInfoRow}>
-                        <Text style={styles.cancelledInfoLabel}>Reason:</Text>
-                        <Text style={styles.cancelledInfoValue}>{selectedOrder.CancellationReason || "No reason provided"}</Text>
-                      </View>
-                      <View style={styles.cancelledInfoRow}>
-                        <Text style={styles.cancelledInfoLabel}>By:</Text>
-                        <Text style={styles.cancelledInfoValue}>{selectedOrder.CancelledByUserName || "SYSTEM"}</Text>
-                      </View>
-                      <View style={styles.cancelledInfoRow}>
-                        <Text style={styles.cancelledInfoLabel}>Date:</Text>
-                        <Text style={styles.cancelledInfoValue}>
-                          {selectedOrder.CancelledDate ? new Date(selectedOrder.CancelledDate).toLocaleString() : "N/A"}
-                        </Text>
-                      </View>
+                    <View style={styles.cancelledDetailRow}>
+                      <Text style={styles.cancelledDetailText}>By: {selectedOrder.CancelledByUserName || "SYSTEM"}</Text>
+                      <Text style={styles.cancelledDetailText}>Date: {selectedOrder.CancelledDate ? new Date(selectedOrder.CancelledDate).toLocaleString() : "N/A"}</Text>
                     </View>
                   </View>
                 ) : null}
@@ -3667,45 +3658,49 @@ const styles = StyleSheet.create({
   otherMonthDayText: {
     color: Theme.textMuted,
   },
-  cancelledOrderBanner: {
-    backgroundColor: Theme.danger,
+  cancelledOrderBadge: {
+    backgroundColor: Theme.danger + "08",
     borderRadius: 12,
-    marginTop: 10,
-    marginBottom: 15,
-    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: Theme.danger + "30",
+    padding: 14,
   },
-  cancelledBannerHeader: {
+  cancelledBadgeMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 10,
+    marginBottom: 10,
   },
-  cancelledBannerTitle: {
-    color: '#fff',
+  cancelledBadgeText: {
+    color: Theme.danger,
     fontFamily: Fonts.black,
-    fontSize: 12,
-    letterSpacing: 1,
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
-  cancelledBannerContent: {
-    padding: 12,
-    gap: 6,
+  cancelledReasonBadge: {
+    backgroundColor: Theme.danger + "15",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  cancelledInfoRow: {
+  cancelledReasonText: {
+    color: Theme.danger,
+    fontFamily: Fonts.extraBold,
+    fontSize: 10,
+  },
+  cancelledDetailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: Theme.danger + "15",
+    paddingTop: 8,
   },
-  cancelledInfoLabel: {
-    color: 'rgba(255,255,255,0.7)',
+  cancelledDetailText: {
+    color: Theme.textMuted,
     fontFamily: Fonts.bold,
-    fontSize: 11,
-  },
-  cancelledInfoValue: {
-    color: '#fff',
-    fontFamily: Fonts.extraBold,
-    fontSize: 11,
+    fontSize: 10,
   },
   downloadModalContent: {
     backgroundColor: Theme.bgCard,
